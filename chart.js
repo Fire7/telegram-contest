@@ -341,7 +341,7 @@ class Plot {
   }
 
   handleMouseMove = (event) => {
-    this.mousePos = [event.pageX - this.canvasPos.left, event.pageY - this.canvasPos.top];
+    this.mousePos = [getPageX(event) - this.canvasPos.left, getPageY(event) - this.canvasPos.top];
   };
 
   handleMouseOut = () => {
@@ -350,7 +350,9 @@ class Plot {
 
   initInteractive(canvas) {
     canvas.addEventListener('mousemove', this.handleMouseMove);
+    canvas.addEventListener('touchmove', this.handleMouseMove);
     canvas.addEventListener('mouseout', this.handleMouseOut);
+    canvas.addEventListener('touchend', this.handleMouseOut);
   }
 
   setTheme({ bgColor, scaleColor, textColor, mouseLineColor }) {
@@ -936,21 +938,25 @@ class ControlPlot extends Plot {
     this.startRight = 1;
 
     this.gl.canvas.addEventListener('mousedown', this.handleMouseDown);
+    this.gl.canvas.addEventListener('touchstart', this.handleMouseDown);
     document.addEventListener('mousemove', this.handleDocMouseMove);
+    document.addEventListener('touchmove', this.handleDocMouseMove);
     document.addEventListener('mouseup', this.handleDocMouseUp);
+    document.addEventListener('touchend', this.handleDocMouseUp);
   }
 
   handleMouseDown = (event) => {
-    const offset = event.pageX - this.canvasPos.left;
+    const pageX = getPageX(event);
+    const offset = pageX - this.canvasPos.left;
 
     const rectPositionLeft = this.left * this.canvasPos.width;
     const rectPositionRight = this.right * this.canvasPos.width;
 
-    if (Math.abs(rectPositionLeft - offset) < 10) {
+    if (Math.abs(rectPositionLeft - offset) < 20) {
       this.drag = 'left';
     }
 
-    if (Math.abs(rectPositionRight - offset) < 10) {
+    if (Math.abs(rectPositionRight - offset) < 20) {
       this.drag = 'right';
     }
 
@@ -959,7 +965,7 @@ class ControlPlot extends Plot {
     }
 
     if (this.drag) {
-      this.startDragPos = event.pageX;
+      this.startDragPos = pageX;
       this.startLeft = this.left;
       this.startRight = this.right;
     }
@@ -970,7 +976,7 @@ class ControlPlot extends Plot {
       return;
     }
 
-    const delta = event.pageX - this.startDragPos;
+    const delta = getPageX(event) - this.startDragPos;
     const normDelta = delta / this.canvasPos.width;
 
     let left = this.startLeft;

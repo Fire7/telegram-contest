@@ -80,9 +80,7 @@ let width = mainElem.clientWidth;
 let charts = [];
 
 function doResize() {
-  console.log('doResize', width !== mainElem.clientWidth);
   if (width !== mainElem.clientWidth) {
-
     index = 0;
     width = mainElem.clientWidth;
     requestAnimationFrame(resizeCharts);

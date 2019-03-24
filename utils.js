@@ -69,3 +69,11 @@ function writeValueToBuffer(buffer, value, offset) {
   buffer[offset + 1] = g;
   buffer[offset + 2] = b;
 }
+
+function getPageX(event) {
+  return event.touches ? event.touches[0].pageX : event.pageX;
+}
+
+function getPageY(event) {
+  return event.touches ? event.touches[0].pageY : event.pageY;
+}
