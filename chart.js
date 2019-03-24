@@ -220,8 +220,7 @@ class Plot {
       scaleStep: gl.getUniformLocation(program, 'u_scale_step'),
 
       bgColor: gl.getUniformLocation(program, 'u_bg_color'),
-      substrateColor: gl.getUniformLocation(program, 'u_substrate_color'),
-      rectColor: gl.getUniformLocation(program, 'u_rect_color'),
+      mouseLineColor: gl.getUniformLocation(program, 'u_mouseline_color'),
 
       selectedCircleRadius: gl.getUniformLocation(program, 'u_selected_circle_radius'),
     };
@@ -335,9 +334,10 @@ class Plot {
     canvas.addEventListener('mouseout', this.handleMouseOut);
   }
 
-  setTheme({ rectColor, bgColor, substrateColor, scaleColor, textColor }) {
+  setTheme({ bgColor, scaleColor, textColor, mouseLineColor }) {
     this.gl.uniform3fv(this.uniforms.bgColor, bgColor);
     this.gl.uniform3fv(this.uniforms.scaleColor, scaleColor.concat(scaleColor));
+    this.gl.uniform3fv(this.uniforms.mouseLineColor, mouseLineColor );
 
     this.bgColor = [bgColor[0] / 255, bgColor[1] / 255, bgColor[2] / 255];
 
@@ -583,7 +583,6 @@ class Plot {
 
     for (i; i < this.chartData.length; i += this.dateBasis) {
       x = this.getItemPosition(i) * this.chartWidth;
-      if (this.log1 && this.chartData.id === 'chart_0') console.log(i, Plot.TIME_FORMAT.format(this.chartData.timestamps[i]), x);
 
       if (x < -this.canvasPos.width / 2) { continue; }
       if (x > this.canvasPos.width) { break; }
@@ -591,13 +590,6 @@ class Plot {
         this.leftItem = i;
         firstItem = false;
       }
-      //
-      // console.log(x);
-      //
-      // if (x < 0 || x + Plot.DATE_WIDTH > this.canvasPos.width) {
-      //   this.drawDateItemsAnimations[i] = dt + 200;
-      //   continue;
-      // }
 
       delete this.drawDateItemsAnimations[i];
 
@@ -624,12 +616,6 @@ class Plot {
     }
 
     this.dateBasisChange = false;
-
-    if (this.log1 && this.chartData.id === 'chart_0') {
-      console.log(drawDateItems, this.drawDateItems, this.drawDateItemsAnimations);
-    }
-
-    this.log1 = false;
 
     Object.keys(this.drawDateItemsAnimations).forEach(i => {
       const d = Math.max(0, dt - this.drawDateItemsAnimations[i]) / 400;
@@ -854,7 +840,6 @@ class Plot {
     }
 
     if (valueIndex !== this.valueIndex) {
-      console.log('valueIndex', valueIndex);
       this.popupEl.style.display = 'block';
       this.popupEl.innerHTML = this.popupHTML(valueIndex);
       this.valueIndex = valueIndex;

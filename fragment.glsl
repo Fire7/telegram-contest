@@ -7,6 +7,7 @@ precision mediump float;
 uniform vec3 u_bg_color;
 uniform vec3 u_substrate_color;
 uniform vec3 u_rect_color;
+uniform vec3 u_mouseline_color;
 
 uniform vec2 u_mouse;// Положение курсора мыши в пикселях
 
@@ -159,7 +160,7 @@ void main() {
     float halfXStep = u_x_step * .5;
     float totalItemsInFrame = 1. / u_x_step;
 
-    // Selected value:
+    // Selected value mouse lime:
     float selectedPointIndex = floor(totalItemsInFrame * u_x_offset + stMouse.x / u_x_step + 0.5);
     vec2 selectedPoint = getPointByIndex(selectedPointIndex, stPadding);
     vec2 selectedPointPix = selectedPoint * chartR;
@@ -176,7 +177,7 @@ void main() {
 
     color = mix(
         color,
-        vec4(u_scale_color[0] / 255., 1.),
+        vec4(u_mouseline_color / 255., 1.),
         drawsSelection * mouseLine
     );
 

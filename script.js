@@ -7,6 +7,7 @@ const LIGHT_THEME = {
   bgColor: [255, 255, 255],
   substrateColor: [245, 249, 251],
   scaleColor: [204, 204, 204],
+  mouseLineColor: [224,	230,	234],
   textColor: '#A8B1B7',
 };
 const DARK_THEME = {
@@ -14,6 +15,7 @@ const DARK_THEME = {
   bgColor: [37, 47, 61],
   substrateColor: [32, 42, 55],
   scaleColor: [42, 53, 67],
+  mouseLineColor: [61, 74, 89],
   textColor: '#566776',
 };
 
