@@ -1,4 +1,4 @@
-precision mediump float;
+precision highp float;
 
 #define TEXTURE_SIZE 32.0;
 #define TEXTURE_STEP 1.0 / TEXTURE_SIZE;
