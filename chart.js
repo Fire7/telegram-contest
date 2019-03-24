@@ -53,8 +53,27 @@ class Chart {
 
   handleColumnSelectorChange = (event) => {
     const targetLabel = event.target.dataset.label;
-    const column = this.data.columns.find(({label}) => label === targetLabel);
-    column && (column.active = !column.active);
+    let activeColumns = 0;
+    let switchColumn;
+
+    for (let i = 0, col; i < this.data.columns.length; i++) {
+      col =  this.data.columns[i];
+      activeColumns += Number(col.active);
+      if (col.label === targetLabel) {
+        switchColumn = col;
+      }
+    }
+
+    if (switchColumn) {
+      let toggle = !switchColumn.active;
+
+      if (!toggle && activeColumns < 2) {
+        toggle = true;
+      }
+
+      switchColumn.active = toggle;
+      event.target.checked = toggle;
+    }
   };
 
   rootHTML() {
