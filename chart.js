@@ -154,7 +154,6 @@ class Plot {
 
   constructor(canvasEl, canvasValuesEl, options) {
     this.canvasPos = canvasEl.getBoundingClientRect();
-    // canvasEl.style.width = this.canvasPos.width;
 
     this.options = Object.assign({}, Plot.DEFAULT_OPTIONS, options);
 
@@ -170,6 +169,8 @@ class Plot {
 
     const gl = canvasEl.getContext('webgl', {
       alpha: false,
+      antialias: false,
+      preserveDrawingBuffer: false,
     });
 
     if (!gl) {
@@ -177,37 +178,11 @@ class Plot {
       return;
     }
 
-    const vertexShader = webGLUtils.createShader(gl, gl.VERTEX_SHADER, Plot.VERTEX_SHADER_SRC);
-    const fragmentShader = webGLUtils.createShader(gl, gl.FRAGMENT_SHADER, Plot.FRAGMENT_SHADER_SRC);
-    const program = webGLUtils.createProgram(gl, vertexShader, fragmentShader);
+    this.prepareGL(gl);
 
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    gl.useProgram(program);
-    this.program = program;
+    const program = this.program;
 
     this.buffer = gl.createBuffer();
-    // init data texutre: x;
-    this.dataTexture = gl.createTexture();
-    this.dataTextureUnit = 0;
-    gl.bindTexture(gl.TEXTURE_2D, this.dataTexture);
-    gl.activeTexture(gl.TEXTURE0 + this.dataTextureUnit);
-
-    const uintData = new Uint8Array(Plot.DATA_TEXTURE_SIZE * Plot.DATA_TEXTURE_SIZE * 3);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      Plot.DATA_TEXTURE_LEVEL,
-      gl.RGB, // RGBA
-      Plot.DATA_TEXTURE_SIZE,
-      Plot.DATA_TEXTURE_SIZE,
-      0,
-      gl.RGB, // RGBA
-      gl.UNSIGNED_BYTE,
-      uintData
-    );
-    gl.generateMipmap(gl.TEXTURE_2D);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    // init texture end;
 
     this.attributes = {
       position: gl.getAttribLocation(program, 'a_position'),
@@ -218,12 +193,10 @@ class Plot {
       dataTexture: gl.getUniformLocation(program, 'u_texture'),
       resolution: gl.getUniformLocation(program, 'u_resolution'),
 
-      lineColor: gl.getUniformLocation(program, 'u_line_color'),
       lineThickness: gl.getUniformLocation(program, 'u_line_thickness'),
       lineSmooth: gl.getUniformLocation(program, 'u_line_smooth'),
       lineOpacity: gl.getUniformLocation(program, 'u_line_opacity'),
 
-      yScale: gl.getUniformLocation(program, 'u_y_scale'),
       xStep: gl.getUniformLocation(program, 'u_x_step'),
       xOffset: gl.getUniformLocation(program, 'u_x_offset'),
       xPadding: gl.getUniformLocation(program, 'u_x_padding'),
@@ -242,7 +215,23 @@ class Plot {
       mouseLineColor: gl.getUniformLocation(program, 'u_mouseline_color'),
 
       selectedCircleRadius: gl.getUniformLocation(program, 'u_selected_circle_radius'),
+
+      yScale2:  gl.getUniformLocation(program, 'u_y_scale2'),
+      lineColor2: gl.getUniformLocation(program, 'u_line_color2'),
+      lineOpacity2: gl.getUniformLocation(program, 'u_line_opacity2'),
+      lineDraw: gl.getUniformLocation(program, 'u_line_draw'),
+
     };
+
+    this.yScale = new Array(4);
+    this.lineColor = new Array(4 * 3);
+    this.lineOpacity = new Array(4);
+    this.lineDraw = new Array(4);
+
+    this.yScale.fill(0);
+    this.lineColor.fill(0);
+    this.lineOpacity.fill(0);
+    this.lineDraw.fill(false);
 
     this.gl = gl;
 
@@ -283,6 +272,16 @@ class Plot {
     }
   }
 
+  prepareGL(gl) {
+    const vertexShader = webGLUtils.createShader(gl, gl.VERTEX_SHADER, Plot.VERTEX_SHADER_SRC);
+    const fragmentShader = webGLUtils.createShader(gl, gl.FRAGMENT_SHADER, Plot.FRAGMENT_SHADER_SRC);
+    const program = webGLUtils.createProgram(gl, vertexShader, fragmentShader);
+
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.useProgram(program);
+    this.program = program;
+  }
+
   init(options) {
     this.gl.enable(this.gl.BLEND);
     this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
@@ -307,6 +306,7 @@ class Plot {
        1, -1,
        1,  1
     ]), this.gl.STATIC_DRAW);
+
     this.gl.enableVertexAttribArray(this.attributes.position);
     this.gl.vertexAttribPointer(this.attributes.position, 2, this.gl.FLOAT, false, 0, 0);
 
@@ -356,9 +356,10 @@ class Plot {
   }
 
   setTheme({ bgColor, scaleColor, textColor, mouseLineColor }) {
-    this.gl.uniform3fv(this.uniforms.bgColor, bgColor);
-    this.gl.uniform3fv(this.uniforms.scaleColor, scaleColor.concat(scaleColor));
-    this.gl.uniform3fv(this.uniforms.mouseLineColor, mouseLineColor );
+    this.gl.uniform3fv(this.uniforms.bgColor, normalizeColor(bgColor));
+    const normScaleColor = normalizeColor(scaleColor);
+    this.gl.uniform3fv(this.uniforms.scaleColor, normScaleColor.concat(normScaleColor));
+    this.gl.uniform3fv(this.uniforms.mouseLineColor, normalizeColor(mouseLineColor));
 
     this.bgColor = [bgColor[0] / 255, bgColor[1] / 255, bgColor[2] / 255];
 
@@ -376,6 +377,39 @@ class Plot {
     }, {});
     this.gl.uniform1f(this.uniforms.xStep, chartData.step);
     this.gl.uniform1f(this.uniforms.totalItems, chartData.length);
+
+
+    const gl = this.gl;
+
+    const texture = gl.createTexture();
+    this.dataTexture = texture;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    const buffer = new Uint8Array(128 * 128 * 3);
+
+    chartData.columns.forEach(({ normalBuffer }, index) => {
+      buffer.set(normalBuffer, index * 32 * 32 * 3 * 4);
+    });
+
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      Plot.DATA_TEXTURE_LEVEL,
+      gl.RGB, // RGBA
+      128,
+      128,
+      0,
+      gl.RGB, // RGBA
+      gl.UNSIGNED_BYTE,
+      buffer
+    );
+
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+
+
+    gl.uniform1i(this.uniforms.dataTexture, 0);
 
     this.firstRender = true;
   }
@@ -494,39 +528,24 @@ class Plot {
   }
 
   processColumn(column, index, maxValue, dt) {
-    const gl = this.gl;
+    this.lineColor = this.lineColor.concat(normalizeColor(column.colorRGB));
+    this.yScale[index] = column.max / maxValue;
 
-    gl.uniform3fv(this.uniforms.lineColor, column.colorRGB);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      Plot.DATA_TEXTURE_LEVEL,
-      gl.RGB,
-      Plot.DATA_TEXTURE_SIZE,
-      Plot.DATA_TEXTURE_SIZE,
-      0,
-      gl.RGB,
-      gl.UNSIGNED_BYTE,
-      column.normalBuffer
-    );
-    gl.uniform1i(this.uniforms.dataTexture, this.dataTextureUnit);
-    gl.uniform1f(this.uniforms.yScale, column.max / maxValue);
-
-    index > 0 && gl.uniform2fv(this.uniforms.scaleDraw, [0, 0]);
-
-    gl.uniform1f(this.uniforms.lineOpacity, 1);
-
+    let opacity = 1;
     const animation = this.animatedColumns[column.label];
     if (animation) {
       const animationPosition = (dt - animation.start) / 200;
 
       if (animationPosition >= 1) {
         delete this.animatedColumns[column.label];
-        gl.uniform1f(this.uniforms.lineOpacity, column.active ? 1 : 0);
+        opacity = column.active ? 1 : 0;
       } else {
         this.animationsCount ++ ;
-        gl.uniform1f(this.uniforms.lineOpacity, column.active ? animationPosition : 1 - animationPosition);
+        opacity = column.active ? animationPosition : 1 - animationPosition;
       }
     }
+    this.lineOpacity[index] = opacity;
+    this.lineDraw[index] = opacity > 0;
   }
 
   getMaxValueInPosition(column) {
@@ -716,7 +735,7 @@ class Plot {
     }
 
     this.animationsCount = 0;
-    const drawColumns = [];
+    const drawColumns = {};
     let maxValue = 0;
     let i;
     let column;
@@ -727,7 +746,7 @@ class Plot {
       column = this.chartData.columns[i];
 
       if (this.animatedColumns[column.label] || column.active) {
-        drawColumns.push(column);
+        drawColumns[column.label] = true;
       }
 
       if (!column.active) {
@@ -736,11 +755,6 @@ class Plot {
 
       columnMax = this.getMaxValueInPosition(column);
       maxValue = columnMax > maxValue ? columnMax : maxValue;
-    }
-
-    if (!drawColumns.length) {
-      this.maxValue = 0;
-      return;
     }
 
     if (this.currMaxValue !== maxValue && maxValue !== this.targetMaxValue) {
@@ -809,11 +823,25 @@ class Plot {
     // prepare scales
     this.processScales();
 
+    this.lineColor = [];
+    this.lineDraw = new Array(4);
+    this.lineDraw.fill(false);
+
     // process columns and draw each
-    for (i = 0; i < drawColumns.length; i++) {
-      this.processColumn(drawColumns[i], i, this.currMaxValue, dt);
-      this.draw();
-    }
+    for (i = 0; i < this.chartData.columns.length ; i++) {
+      if (drawColumns[this.chartData.columns[i].label]) {
+        this.processColumn(this.chartData.columns[i], i, this.currMaxValue, dt);
+      } else {
+        this.lineDraw[i] = false;
+      }
+     }
+
+    gl.uniform1fv(this.uniforms.lineDraw, this.lineDraw);
+    gl.uniform1fv(this.uniforms.yScale2, this.yScale);
+    gl.uniform1fv(this.uniforms.lineOpacity2, this.lineOpacity);
+    gl.uniform3fv(this.uniforms.lineColor2, this.lineColor);
+    this.draw();
+
 
     this.renderValues(dt);
     this.renderPopup();
@@ -905,6 +933,16 @@ class ControlPlot extends Plot {
     this.initInteractive();
   }
 
+  prepareGL(gl) {
+    const vertexShader = webGLUtils.createShader(gl, gl.VERTEX_SHADER, Plot.VERTEX_SHADER_SRC);
+    const fragmentShader = webGLUtils.createShader(gl, gl.FRAGMENT_SHADER, ControlPlot.FRAGMENT_SHADER_SRC);
+    const program = webGLUtils.createProgram(gl, vertexShader, fragmentShader);
+
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.useProgram(program);
+    this.program = program;
+  }
+
   init(options) {
     super.init(options);
 
@@ -912,20 +950,15 @@ class ControlPlot extends Plot {
     this.uniforms = Object.assign(this.uniforms, {
       rectTopThickness: gl.getUniformLocation(this.program, 'u_rect_top_thickness'),
       rectLeftThickness: gl.getUniformLocation(this.program, 'u_rect_left_thickness'),
-      drawRect: gl.getUniformLocation(this.program, 'u_draw_rect'),
       rect: gl.getUniformLocation(this.program, 'u_rect'),
       rectColor: gl.getUniformLocation(this.program, 'u_rect_color'),
       substrateColor: gl.getUniformLocation(this.program, 'u_substrate_color'),
-      fill: gl.getUniformLocation(this.program, 'u_fill'),
     });
 
     this.options = Object.assign(this.options, options, ControlPlot.DEFAULT_OPTIONS);
 
-    this.gl.uniform1f(this.uniforms.drawRect, 1);
     this.gl.uniform1f(this.uniforms.rectTopThickness, options.rectTopThickness * this.DPI);
     this.gl.uniform1f(this.uniforms.rectLeftThickness, options.rectLeftThickness * this.DPI);
-
-    this.gl.uniform1f(this.uniforms.xPadding, 0);
   }
 
   initInteractive() {
@@ -1007,8 +1040,9 @@ class ControlPlot extends Plot {
 
   setTheme({rectColor, substrateColor, ...etc }) {
     super.setTheme({ ...etc });
-    this.gl.uniform3fv(this.uniforms.rectColor, rectColor);
-    this.gl.uniform3fv(this.uniforms.substrateColor, substrateColor);
+
+    this.gl.uniform3fv(this.uniforms.rectColor, normalizeColor(rectColor));
+    this.gl.uniform3fv(this.uniforms.substrateColor, normalizeColor(substrateColor));
   }
 
   setSelection(left, right) {
@@ -1018,12 +1052,6 @@ class ControlPlot extends Plot {
 
   getMaxValueInPosition(column) {
     return this.getMaxValue(column.max);
-  }
-
-  processColumn(c, index, ...args) {
-    super.processColumn(c, index, ...args);
-    this.gl.uniform2fv(this.uniforms.scaleDraw, [0, 0]); // TODO: fix, low priority;
-    this.gl.uniform1f(this.uniforms.fill, Number(!index));
   }
 
   storeRenderState() {
@@ -1045,6 +1073,10 @@ class ControlPlot extends Plot {
   render(...args) {
     this.gl.uniform2fv(this.uniforms.rect, [this.left, this.right]);
     super.render(...args);
+  }
+
+  draw() {
+    super.draw();
   }
 
   renderValues() {};

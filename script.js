@@ -1,6 +1,7 @@
 const CHART_DATA_SRC = 'chart_data.json';
 const VERTEX_SHADER_SRC = 'vertex.glsl';
 const FRAGMENT_SHADER_SRC = 'fragment.glsl';
+const FRAGMENT_CONTROLS_SGADER_SRC = 'fragment-controls.glsl';
 const DATA_TEXTURE_SIZE = 32;
 const LIGHT_THEME = {
   rectColor: [222, 234, 242],
@@ -99,10 +100,12 @@ async function main() {
   const [
     vertexShaderSource,
     fragmentShaderSource,
+    fragmentControlsShaderSource,
     chartDataRaw
   ] = await Promise.all([
     loadFromSrc(VERTEX_SHADER_SRC),
     loadFromSrc(FRAGMENT_SHADER_SRC),
+    loadFromSrc(FRAGMENT_CONTROLS_SGADER_SRC),
     loadFromSrc(CHART_DATA_SRC, true)
   ]);
 
@@ -111,8 +114,9 @@ async function main() {
   Plot.DATA_TEXTURE_SIZE = DATA_TEXTURE_SIZE;
   Plot.VERTEX_SHADER_SRC = vertexShaderSource;
   Plot.FRAGMENT_SHADER_SRC = fragmentShaderSource;
+  ControlPlot.FRAGMENT_SHADER_SRC = fragmentControlsShaderSource;
 
-  charts = chartData.map((data, index) => {
+  charts = chartData/*.slice(0,1)*/.map((data, index) => {
     return new Chart(document.getElementById('chart' + (index + 1)), data, LIGHT_THEME);
   });
 

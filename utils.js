@@ -77,3 +77,7 @@ function getPageX(event) {
 function getPageY(event) {
   return event.touches ? event.touches[0].pageY : event.pageY;
 }
+
+function normalizeColor([r, g, b]) {
+  return [r / 255, g / 255, b / 255];
+}

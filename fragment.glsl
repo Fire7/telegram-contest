@@ -1,29 +1,22 @@
 precision highp float;
 
-#define TEXTURE_SIZE 32.0;
-#define TEXTURE_STEP 1.0 / TEXTURE_SIZE;
+#define TEXTURE_SIZE 128.0
+#define TEXUTE_STEP 0.0078125
 
 // Theme:
 uniform vec3 u_bg_color;
-uniform vec3 u_substrate_color;
-uniform vec3 u_rect_color;
 uniform vec3 u_mouseline_color;
 
 uniform vec2 u_mouse;// Положение курсора мыши в пикселях
 
-uniform vec2 u_resolution;          // Canvas resolution
-uniform vec3 u_line_color;
+uniform vec2 u_resolution;// Canvas resolution
 uniform float u_line_smooth;
 uniform float u_line_thickness;
-uniform float u_line_opacity;//
-uniform sampler2D u_texture;    //  Data texture
-uniform float u_draw_rect;
-uniform float u_fill;
+uniform sampler2D u_texture;//  Data texture
 
 uniform float u_total_items;
 
 uniform float u_x_step;
-uniform float u_y_scale;
 uniform float u_x_offset;
 uniform float u_x_padding;
 
@@ -38,9 +31,12 @@ uniform vec2 u_scale_count;
 
 uniform float u_selected_circle_radius;
 
-uniform vec2 u_rect;
-uniform float u_rect_top_thickness;
-uniform float u_rect_left_thickness;
+uniform float u_y_scale2[4];
+uniform vec3 u_line_color2[4];
+uniform float u_line_opacity2[4];
+
+uniform bool u_line_draw[4];
+
 
 float distance_to_line_segment(vec2 p, vec2 a, vec2 b){
     vec2 ba = b - a;
@@ -62,30 +58,65 @@ float parseFloat(float a, float b, float c) {
     return (a * 65280. + b * 255. + c) / 65281.;
 }
 
-float scale(float pix, float draw, float offset, float count, float xOffset, float thickness) {
+float scale(float pix, float offset, float count, float xOffset, float thickness) {
     pix += thickness * 0.5;
     count = step(0., count - pix / offset);
     float axis = step(0., thickness - (mod(pix, offset)));
-    return draw * xOffset * count * axis;
+    return xOffset * count * axis;
 }
 
-vec2 getTextureCoordByIndex(float index) {
-    float iStep = TEXTURE_STEP;
-    float ts = TEXTURE_SIZE;
 
-    float i =  floor(index / ts) * iStep;
-    float j =  floor(mod (index, ts)) * iStep;
-
+vec2 getTextureCoordByIndex(float index, float unit) {
+    float i =  floor(index / TEXTURE_SIZE) * TEXUTE_STEP + unit;
+    float j =  floor(mod(index, TEXTURE_SIZE)) * TEXUTE_STEP;
     return vec2(j, i);
 }
 
-vec2 getPointByIndex(float index, float padding) {
-    vec4 value = texture2D(u_texture, getTextureCoordByIndex(index));
-    float x = index * u_x_step - u_x_offset;
-    x += padding;
-
-    float y = parseFloat(value.r, value.g, value.b) * u_y_scale;
+vec2 getPointByIndex(float index, float padding, float textureUnit, float yScale) {
+    vec4 value = texture2D(u_texture, getTextureCoordByIndex(index, textureUnit));
+    float x = index * u_x_step - u_x_offset + padding;
+    float y = parseFloat(value.r, value.g, value.b) * yScale;
     return vec2(x, y);
+}
+
+vec4 plot(vec4 color, float currPointIndex, float index, vec3 lineColor, float yScale, float lineOpacity, float firstItem, float lastItem, float outOfRange, float stPadding, vec2 chartR, float selectedPointIndex, bool drawSelection, vec4 bgColor) {
+
+    vec2 P = gl_FragCoord.xy;
+
+    vec2 currPointPix = getPointByIndex(currPointIndex, stPadding, index, yScale) * chartR;
+    vec2 prevPointPix = getPointByIndex(currPointIndex - 1., stPadding, index, yScale) * chartR;
+    vec2 nextPointPix = getPointByIndex(currPointIndex + 1., stPadding, index, yScale) * chartR;
+
+    float minDist = min(
+    firstItem * 1000. + distance_to_line_segment(P.xy, prevPointPix, currPointPix),
+    lastItem * 1000. + distance_to_line_segment(P.xy, currPointPix, nextPointPix)
+    );
+
+    if (u_line_thickness - minDist > 0.) {
+        color = mix(
+        color,
+        vec4(lineColor, lineOpacity),
+        outOfRange * smooth_line(minDist, u_line_thickness, u_line_thickness - u_line_smooth)
+        );
+    }
+
+    vec2 selectedPointPix = getPointByIndex(selectedPointIndex, stPadding, index, yScale) * chartR;
+    if (drawSelection && u_selected_circle_radius - distance(P, selectedPointPix) > -2.) {
+        // Selected value draw:
+        color = mix(
+        color,
+        vec4(lineColor, lineOpacity),
+        circle(P.xy, selectedPointPix, u_selected_circle_radius, 2.)
+        );
+
+        color = mix(
+        color,
+        vec4(bgColor.rgb, 1.),
+        circle(P.xy, selectedPointPix, u_selected_circle_radius - u_line_thickness - 1., 2.)
+        );
+    }
+
+    return color;
 }
 
 void main() {
@@ -105,7 +136,7 @@ void main() {
     stMouse = u_mouse / chartR;
     stMouse.x -= stPadding;
 
-    vec4 bgColor = vec4(u_bg_color / 255., 0.);
+    vec4 bgColor = vec4(u_bg_color, 0.);
     vec4 color = bgColor;
 
     vec2 P = gl_FragCoord.xy;
@@ -115,145 +146,77 @@ void main() {
 
     color = mix(
         color,
-        vec4(u_scale_color[0] / 255., u_scale_opacity[0]),
-        scale(P.y, u_scale_draw[0], u_scale_step[0], u_scale_count[0], scalesXOffset, u_scale_thickness[0])
+        vec4(u_scale_color[0], u_scale_opacity[0]),
+        scale(P.y, u_scale_step[0], u_scale_count[0], scalesXOffset, u_scale_thickness[0])
     );
+
+
+    if (u_scale_draw[1] == 1.) {
+        color = mix(
+            color,
+            vec4(u_scale_color[1], u_scale_opacity[1]),
+            scale(P.y, u_scale_step[1], u_scale_count[1], scalesXOffset, u_scale_thickness[1])
+        );
+    }
 
     color = mix(
         color,
-        vec4(u_scale_color[1] / 255., u_scale_opacity[1]),
-        scale(P.y, u_scale_draw[1], u_scale_step[1], u_scale_count[1], scalesXOffset, u_scale_thickness[1])
-    );
-
-    color = mix(
-        color,
-        vec4(u_scale_color[0] / 255., 1.),
+        vec4(u_scale_color[0], 1.),
         u_scale_draw[0] * scalesXOffset * step(u_scale_offset_x[0], P.x) * step(0., u_scale_thickness[0] - P.y)
     );
+
     // scales end
 
 
-
     // Selection rect border left and right:
-    vec2 rect = u_rect * R.x;
-
-    vec4 substrateColor = vec4(u_substrate_color / 255., 0.05);
-    vec4 rectColor = vec4(u_rect_color / 255., 1.);
-
-    float leftRectBorder =
-    step(rect.x, P.x) *
-    (1. - step(rect.x + u_rect_left_thickness, P.x));
-
-    float rightRectBorder =
-    step(rect.y - u_rect_left_thickness, P.x) *
-    (1. - step(rect.y, P.x));
-
-    float leftRightRectBorders = max(leftRectBorder, rightRectBorder);
-
-    color = mix(color, rectColor, u_fill * leftRightRectBorders);
 
     // Selection rect end;
-    vec3 lineColor = u_line_color / 255.;
-    float line;
-    float x;
-    float y;
-    float halfXStep = u_x_step * .5;
     float totalItemsInFrame = 1. / u_x_step;
 
     // Selected value mouse lime:
     float selectedPointIndex = floor(totalItemsInFrame * u_x_offset + stMouse.x / u_x_step + 0.5);
-    vec2 selectedPoint = getPointByIndex(selectedPointIndex, stPadding);
-    vec2 selectedPointPix = selectedPoint * chartR;
-
-
-    float mouseLine =
-    u_scale_draw[0] *
-    step(selectedPointPix.x - u_scale_thickness[0], P.x) *
-    (1. - step(selectedPointPix.x + u_scale_thickness[0], P.x));
-
-    float firstItemSelected = step(0., selectedPointIndex);
-    float lastItemSelected = 1. - step(0. , selectedPointIndex - u_total_items);
-    float drawsSelection = firstItemSelected * lastItemSelected;
-
-    color = mix(
-        color,
-        vec4(u_mouseline_color / 255., 1.),
-        drawsSelection * mouseLine
-    );
-
-
     float currPointIndex = floor(totalItemsInFrame * u_x_offset +  /*st.x*/chartSt.x / u_x_step + 0.5);
-    vec2 currPoint = getPointByIndex(currPointIndex, stPadding);
-    vec2 currPointPix = currPoint * chartR;
 
-    vec2 prevPoint = getPointByIndex(currPointIndex - 1., stPadding);
-    vec2 prevPointPix = prevPoint * chartR;
-    vec2 nextPoint = getPointByIndex(currPointIndex + 1., stPadding);
 
     float firstItem = 1. - step(0., currPointIndex - 1.);
-    float lastItem = step(0. , currPointIndex + 1. - u_total_items);
-
-    vec2 nextPointPix = nextPoint * chartR;
-    float minDist = min(
-        firstItem * 1000. + distance_to_line_segment(P.xy, prevPointPix, currPointPix),
-        lastItem * 1000. + distance_to_line_segment(P.xy, currPointPix, nextPointPix)
-    );
-
-    line = smooth_line(minDist, u_line_thickness, u_line_thickness - u_line_smooth);
-
-    firstItem = step(0., currPointIndex);
-    lastItem = 1. - step(0. , currPointIndex - u_total_items);
-
-    color = mix(
-        color,
-        vec4(lineColor, u_line_opacity),
-        firstItem * lastItem * line
-    );
+    float lastItem = step(0., currPointIndex + 1. - u_total_items);
 
 
-    // Selected value draw:
-    color = mix(
-        color,
-        vec4(lineColor, u_line_opacity),
-        drawsSelection * (1. - u_draw_rect) * circle(P.xy, selectedPointPix, u_selected_circle_radius, 2.)
-    );
+    float outOfRange =  step(0., currPointIndex) *  (1. - step(0., currPointIndex - u_total_items));
 
-    color = mix(
-        color,
-        vec4(bgColor.rgb, 1.),
-        drawsSelection * (1. - u_draw_rect) * circle(P.xy, selectedPointPix, u_selected_circle_radius - u_line_thickness - 1., 2.)
-    );
+    float firstItemSelected = step(0., selectedPointIndex);
+    float lastItemSelected = 1. - step(0., selectedPointIndex - u_total_items);
+    float drawsSelection = firstItemSelected * lastItemSelected;
+    bool drawsSelectionB = drawsSelection == 1.;
 
-    float topBottomSubstrateBorder =
-    max(
-        step(R.y - u_rect_top_thickness, P.y),
-        (1. - step(u_rect_top_thickness, P.y))
-    ) *
-    step(rect.x, P.x) *
-    step(P.x, rect.y);
 
-    color = mix(
-        color,
-        rectColor,
-        topBottomSubstrateBorder
-    );
+    if (drawsSelectionB) {
+        float selectedPointX = (selectedPointIndex * u_x_step - u_x_offset + stPadding) * chartR.x;
 
-    substrateColor = vec4(u_substrate_color / 255., 1.);
-    float leftSubstrate = step(P.x, rect.x);
-    float rightSubstrate = step(rect.y, P.x);
+        float mouseLine =
+            step(selectedPointX - u_scale_thickness[0], P.x) *
+            (1. - step(selectedPointX + u_scale_thickness[0], P.x));
 
-    // Substrate
-    color = mix(
-        color,
-        substrateColor,
-        max(
-            u_fill,
-            u_draw_rect * sign(distance(color, bgColor))
-        ) *
-        max(leftSubstrate, rightSubstrate) *
-        0.75 *
-        u_line_opacity
-    );
+
+        color = mix(
+            color,
+            vec4(u_mouseline_color, 1.),
+            mouseLine
+        );
+    }
+
+    color = u_line_draw[0]
+        ? plot(color, currPointIndex, 0., u_line_color2[0], u_y_scale2[0], u_line_opacity2[0], firstItem, lastItem, outOfRange, stPadding, chartR, selectedPointIndex, drawsSelectionB, bgColor)
+        : color;
+    color = u_line_draw[1]
+        ? plot(color, currPointIndex, 0.25, u_line_color2[1], u_y_scale2[1], u_line_opacity2[1], firstItem, lastItem, outOfRange, stPadding, chartR, selectedPointIndex, drawsSelectionB, bgColor)
+        : color;
+    color = u_line_draw[2]
+        ? plot(color, currPointIndex, 0.5, u_line_color2[2], u_y_scale2[2], u_line_opacity2[2], firstItem, lastItem, outOfRange, stPadding, chartR, selectedPointIndex, drawsSelectionB, bgColor)
+        : color;
+    color = u_line_draw[3]
+        ? plot(color, currPointIndex, 0.75, u_line_color2[3], u_y_scale2[3], u_line_opacity2[3], firstItem, lastItem, outOfRange, stPadding, chartR, selectedPointIndex, drawsSelectionB, bgColor)
+        : color;
 
     gl_FragColor = color;
     return;
