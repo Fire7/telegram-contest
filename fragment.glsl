@@ -122,7 +122,6 @@ vec4 plot(vec4 color, float currPointIndex, float index, vec3 lineColor, float y
 void main() {
     vec2 R = u_resolution.xy;
     vec2 st = gl_FragCoord.xy / R;
-
     vec2 stMouse = u_mouse / R;
 
 

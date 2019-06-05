@@ -5,6 +5,16 @@ body {
     font-size: 16px;
     color: black;
     background: white;
+
+    width: 100%;
+    width: 100vw;
+
+    overflow-x: hidden;
+
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -webkit-touch-callout: none;
 }
 
 main {
@@ -30,8 +40,8 @@ h3 {
 }
 
 .chart-controls-holder {
-    margin-top: 15px;
-    padding: 0 20px;
+    margin: 15px 20px 0;
+    position: relative;
 }
 
 .chart-holder > canvas {
@@ -51,47 +61,89 @@ h3 {
     height: 70px;
 }
 
+.chart-controls-holder .control {
+    position: absolute;
+    height: 70px;
+    pointer-events: none;
+    top: 0;
+}
+
+.chart-controls-holder .substrate {
+    background-color: rgba(232, 241, 245, 0.7);
+}
+
+.chart-controls-holder .substrate.substrate-left {
+    left: 0;
+}
+
+.chart-controls-holder .substrate.substrate-right {
+    right: 0;
+}
+
+.chart-controls-holder .rect {
+    border-color: #C0D1E0;
+    border-radius: 5px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+    border-left-width: 15px;
+    border-right-width: 15px;
+    border-style: solid;
+    box-sizing: border-box;
+    margin-left: -15px;
+    margin-right: -15px;
+}
+
+.chart-controls-holder .rect::before {
+    content: '';
+    position: absolute;
+    height: 16px;
+    width: 3px;
+    left: -9px;
+    top: 27px;
+    background-color: white;
+    border-radius: 3px;
+}
+
+.chart-controls-holder .rect::after {
+    content: '';
+    position: absolute;
+    height: 16px;
+    width: 3px;
+    right: -9px;
+    top: 27px;
+    background-color: white;
+    border-radius: 3px;
+}
+
 .popup {
     position: absolute;
-    border-radius: 5px;
+    border-radius: 12px;
+    width: 160px;
     box-shadow: 1px 1px 5px 0px rgba(0, 0, 0, 0.35);
-    padding: 10px;
-    pointer-events: none;
-    font-family: Helvetica;
-
+    padding: 10px 12px; /* 15 20 */
     top: 50px;
     left: -30px;
     background: white;
-}
-
-.popup .date {
     font-size: 15px;
+    line-height: 24px;
 }
 
-.popup .values {
-    display: flex;
-    margin-top: 10px;
-}
-
-.popup .values > div {
-    width: 55px;
-
-}
-
-.popup .values .value {
-    font-size: 18px;
+.popup .bold {
     font-weight: bold;
 }
 
-.popup .values .name {
-    margin-top: 5px;
-    font-size: 12px;
+.popup .right {
+    float: right;
+}
+
+.popup .pre {
+    white-space: pre;
 }
 
 .column-selector {
     display: flex;
     margin-top: 30px;
-
+    flex-wrap: wrap;
 }
 
 .column-selector label {

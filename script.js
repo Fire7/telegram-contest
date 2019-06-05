@@ -3,7 +3,7 @@ const VERTEX_SHADER_SRC = 'vertex.glsl';
 const FRAGMENT_SHADER_SRC = 'fragment.glsl';
 const FRAGMENT_CONTROLS_SGADER_SRC = 'fragment-controls.glsl';
 const DATA_TEXTURE_SIZE = 32;
-const LIGHT_THEME = {
+/*const LIGHT_THEME = {
   rectColor: [222, 234, 242],
   bgColor: [255, 255, 255],
   substrateColor: [245, 249, 251],
@@ -18,62 +18,29 @@ const DARK_THEME = {
   scaleColor: [42, 53, 67],
   mouseLineColor: [61, 74, 89],
   textColor: '#566776',
+};*/
+
+const LIGHT_THEME = {
+  rectColor: 'rgba(70, 150, 201, 0.2)',
+  bgColor: '#ffffff',
+  substrateColor: 'rgba(232, 241, 245, 0.7)',
+  scaleColor: '#cccccc',
+  mouseLineColor: '#e0e6ea',
+  textColor: '#A8B1B7',
+};
+const DARK_THEME = {
+  rectColor: 'rgba(145, 198, 235, 0.3)',
+  bgColor: '#252f3d',
+  substrateColor: 'rgba(26, 39, 51, 0.6)',
+  scaleColor: '#2a3543',
+  mouseLineColor: '#3d4a59',
+  textColor: '#566776',
 };
 
 const bodyElem = document.getElementsByTagName('body')[0];
 const mainElem = document.getElementsByTagName('main')[0];
 
 let nightMode = false;
-
-function parseChartData(data) {
-  return data.map((data, idx) => {
-    const res = {
-      id: `chart_${idx}`,
-      columns: [],
-      timestamps: [],
-      step: 0,
-      length: 0,
-    };
-
-    data.columns.forEach(arr => {
-      const label = arr[0];
-      const values = arr.slice(1);
-      const type = data.types[label];
-
-      switch (type) {
-        case 'x':
-          res.timestamps = values;
-          res.length = res.timestamps.length;
-          res.step = 1 / (res.length - 1);
-          break;
-        case 'line':
-          const column = {
-            active: true,
-            label,
-            name: data.names[label],
-            color: data.colors[label],
-            colorRGB: hexToRgb(data.colors[label]),
-            values,
-          };
-
-          const max = Math.max.apply(null, values);
-          const normalData = values.map(v => v / max);
-
-          const normalBuffer = new Uint8Array(DATA_TEXTURE_SIZE * DATA_TEXTURE_SIZE * 3);
-          normalData.forEach((val, idx) => {
-            writeValueToBuffer(normalBuffer, val, idx);
-          });
-
-          column.max = max;
-          column.normalData = normalData;
-          column.normalBuffer = normalBuffer;
-          res.columns.push(column);
-        break;
-        }
-    });
-    return res;
-  });
-}
 
 let resizeTimeout = 0;
 let width = mainElem.clientWidth;
@@ -101,23 +68,45 @@ async function main() {
     vertexShaderSource,
     fragmentShaderSource,
     fragmentControlsShaderSource,
-    chartDataRaw
+    chartDataRaw,
+    chart1Data,
+    chart2Data,
+    chart3Data,
+    chart4Data,
+    chart5Data,
   ] = await Promise.all([
     loadFromSrc(VERTEX_SHADER_SRC),
     loadFromSrc(FRAGMENT_SHADER_SRC),
     loadFromSrc(FRAGMENT_CONTROLS_SGADER_SRC),
-    loadFromSrc(CHART_DATA_SRC, true)
+    loadFromSrc(CHART_DATA_SRC, true),
+    loadFromSrc('data/1/overview.json', true),
+    loadFromSrc('data/2/overview.json', true),
+    loadFromSrc('data/3/overview.json', true),
+    loadFromSrc('data/4/overview.json', true),
+    loadFromSrc('data/5/overview.json', true),
   ]);
 
-  const chartData = parseChartData(chartDataRaw);
+  chart1Data.path = '1';
+  chart1Data.name = 'Followers';
+  chart2Data.path = '2';
+  chart2Data.name = 'Interactions';
+  chart3Data.path = '3';
+  chart3Data.name = 'Messages';
+  chart4Data.path = '4';
+  chart4Data.name = 'Views';
+  chart5Data.path = '5';
+  chart5Data.name = 'Apps';
 
-  Plot.DATA_TEXTURE_SIZE = DATA_TEXTURE_SIZE;
-  Plot.VERTEX_SHADER_SRC = vertexShaderSource;
-  Plot.FRAGMENT_SHADER_SRC = fragmentShaderSource;
-  ControlPlot.FRAGMENT_SHADER_SRC = fragmentControlsShaderSource;
+  const newChartData = [chart1Data, chart2Data, chart3Data, chart4Data, chart5Data];
+  window['$newChartData'] = newChartData;
 
-  charts = chartData/*.slice(0,1)*/.map((data, index) => {
-    return new Chart(document.getElementById('chart' + (index + 1)), data, LIGHT_THEME);
+
+  const chartData = [chart1Data, chart2Data, chart3Data, chart4Data, chart5Data].map(parseChartData);//newChartData.slice(0,1).map(parseChartData);
+  // const chartData = chartDataRaw.map(parseChartData);//newChartData.slice(0,1).map(parseChartData);
+
+
+  charts = chartData.map((data, index) => {
+    return new Chart2(document.getElementById('chart' + (index + 1)), data, LIGHT_THEME);
   });
 
   const themeSwitcher = document.getElementById('switch_theme');

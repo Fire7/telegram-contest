@@ -600,7 +600,7 @@ class Plot {
       this.ctx.globalAlpha = opacity;
 
       for (let i = 6; i--;) {
-        this.ctx.fillText(this.formatValue(i * step), 20 * this.DPI, this.gl.canvas.height - i * textOffset - 5);
+        this.ctx.fillText(this.formatValue(i * step), 20 * this.DPI, this.ctxMain.canvas.height - i * textOffset - 5);
       }
     });
   }
